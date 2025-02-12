@@ -16,8 +16,8 @@ class User:
     password: str
     roles: List[str]
     preferences: UserPreferences
-    active: bool = True
     created_ts: float
+    active: bool = True
 
 
 def parse_roles(user_data: dict) -> List[str]:
@@ -50,14 +50,14 @@ def parse_user(user_data: dict) -> User:
         password=user_data['password'],
         roles=parse_roles(user_data),
         preferences=preferences,
-        active=user_data['is_user_active'],
-        created_ts=created_ts
+        created_ts=created_ts,
+        active=user_data['is_user_active']
     )
 
 
 def main():
-    # MongoDB connection
-    client = pymongo.MongoClient('mongodb://localhost:27017/')
+    # MongoDB connection using the service name from docker-compose
+    client = pymongo.MongoClient('mongodb://mongodb:27017/')
     db = client['user_db']
     collection = db['users']
 
