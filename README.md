@@ -29,7 +29,7 @@ A full-stack web application for managing users with role-based access control. 
 
 ```bash
 git clone <repository-url>
-cd user-management-system
+cd coding-test
 ```
 
 2. Start the application using Docker Compose:
