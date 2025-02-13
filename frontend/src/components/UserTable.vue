@@ -1,130 +1,199 @@
 <template>
-  <v-container>
+  <v-container fluid>
     <v-row>
-      <v-col>
-        <v-btn color="primary" @click="openUserDialog()" class="mb-4"> Create User </v-btn>
+      <v-col cols="12">
+        <h1 class="text-2xl font-bold mb-4">User List</h1>
 
-        <v-data-table :headers="headers" :items="users" :loading="loading" class="elevation-1">
+        <!-- Create User Button -->
+        <v-btn color="primary" dark class="mb-4" @click="openCreateModal">
+          <v-icon left>mdi-plus</v-icon> Create User
+        </v-btn>
+
+        <!-- User Table -->
+        <v-data-table
+          :items="users"
+          :headers="headers"
+          item-value="_id"
+          class="elevation-1"
+          v-if="!loading && !error"
+        >
           <template v-slot:item.username="{ item }">
-            <router-link :to="'/user/' + item._id">
+            <a :href="'/users/' + item._id" class="text-blue-600 underline">
               {{ item.username }}
-            </router-link>
+            </a>
           </template>
 
           <template v-slot:item.roles="{ item }">
-            <v-chip v-for="role in item.roles" :key="role" class="mr-1" small>
-              {{ role }}
-            </v-chip>
+            {{ item.roles.join(', ') }}
           </template>
 
           <template v-slot:item.active="{ item }">
-            <v-chip :color="item.active ? 'green' : 'red'" small>
-              {{ item.active ? 'Active' : 'Inactive' }}
+            <v-chip :color="item.active ? 'green' : 'red'" dark>
+              {{ item.active ? 'Yes' : 'No' }}
             </v-chip>
           </template>
 
+          <template v-slot:item.updated_ts="{ item }">
+            {{ formatDate(item.updated_ts) }}
+          </template>
+
+          <template v-slot:item.created_ts="{ item }">
+            {{ formatDate(item.created_ts) }}
+          </template>
+
           <template v-slot:item.actions="{ item }">
-            <v-icon small class="mr-2" @click="openUserDialog(item)"> mdi-pencil </v-icon>
-            <v-icon small @click="confirmDelete(item)"> mdi-delete </v-icon>
+            <v-btn icon color="yellow darken-2" @click="openEditModal(item)">
+              <v-icon>mdi-pencil</v-icon>
+            </v-btn>
+            <v-btn icon color="red darken-2" @click="confirmDelete(item._id)">
+              <v-icon>mdi-delete</v-icon>
+            </v-btn>
           </template>
         </v-data-table>
 
-        <!-- User Dialog -->
-        <user-dialog v-model="dialog" :user="selectedUser" @save="saveUser" />
-
-        <!-- Delete Confirmation -->
-        <v-dialog v-model="deleteDialog" max-width="400">
-          <v-card>
-            <v-card-title>Confirm Delete</v-card-title>
-            <v-card-text> Are you sure you want to delete this user? </v-card-text>
-            <v-card-actions>
-              <v-spacer></v-spacer>
-              <v-btn color="grey darken-1" text @click="deleteDialog = false"> Cancel </v-btn>
-              <v-btn color="red darken-1" text @click="deleteUser"> Delete </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-dialog>
+        <v-alert v-if="loading" type="info">Loading...</v-alert>
+        <v-alert v-if="error" type="error">{{ error }}</v-alert>
       </v-col>
     </v-row>
+
+    <!-- Create/Edit User Dialog -->
+    <v-dialog v-model="showModal" max-width="500px">
+      <v-card>
+        <v-card-title>{{ isEditing ? 'Edit User' : 'Create User' }}</v-card-title>
+        <v-card-text>
+          <v-text-field v-model="selectedUser.username" label="Username"></v-text-field>
+          <v-text-field v-model="selectedUser.roles" label="Roles (comma-separated)"></v-text-field>
+          <v-text-field v-model="selectedUser.preferences.timezone" label="Timezone"></v-text-field>
+          <v-switch v-model="selectedUser.active" label="Active"></v-switch>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn text @click="showModal = false">Cancel</v-btn>
+          <v-btn color="primary" @click="handleSave">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Delete Confirmation Dialog -->
+    <v-dialog v-model="showDeleteConfirm" max-width="400px">
+      <v-card>
+        <v-card-title>Confirm Delete</v-card-title>
+        <v-card-text>Are you sure you want to delete this user?</v-card-text>
+        <v-card-actions>
+          <v-btn text @click="showDeleteConfirm = false">Cancel</v-btn>
+          <v-btn color="red darken-2" @click="deleteUser">Delete</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script>
-import UserDialog from './UserDialog.vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
 export default {
-  name: 'UserTable',
+  setup() {
+    const users = ref([])
+    const loading = ref(true)
+    const error = ref(null)
+    const showModal = ref(false)
+    const showDeleteConfirm = ref(false)
+    const selectedUser = ref({})
+    const isEditing = ref(false)
+    const userIdToDelete = ref(null)
 
-  components: {
-    UserDialog,
-  },
-
-  data: () => ({
-    headers: [
+    const headers = [
       { text: 'Username', value: 'username' },
       { text: 'Roles', value: 'roles' },
       { text: 'Timezone', value: 'preferences.timezone' },
       { text: 'Active', value: 'active' },
+      { text: 'Last Updated At', value: 'updated_ts' },
       { text: 'Created At', value: 'created_ts' },
       { text: 'Actions', value: 'actions', sortable: false },
-    ],
-    users: [],
-    loading: false,
-    dialog: false,
-    deleteDialog: false,
-    selectedUser: null,
-  }),
+    ]
 
-  methods: {
-    async fetchUsers() {
-      this.loading = true
+    const fetchUsers = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/api/users')
-        this.users = response.data
-      } catch (error) {
-        console.error('Error fetching users:', error)
+        const response = await axios.get('http://localhost:8000/api/users')
+        users.value = response.data
+      } catch (err) {
+        error.value = 'Failed to fetch users'
+      } finally {
+        loading.value = false
       }
-      this.loading = false
-    },
+    }
 
-    openUserDialog(user = null) {
-      this.selectedUser = user
-      this.dialog = true
-    },
+    const openCreateModal = () => {
+      selectedUser.value = { username: '', roles: [], preferences: { timezone: '' }, active: false }
+      isEditing.value = false
+      showModal.value = true
+    }
 
-    async saveUser(userData) {
+    const openEditModal = (user) => {
+      selectedUser.value = { ...user }
+      isEditing.value = true
+      showModal.value = true
+    }
+
+    const handleSave = async () => {
       try {
-        if (userData._id) {
-          await axios.put(`http://localhost:5000/api/users/${userData._id}`, userData)
+        if (isEditing.value) {
+          await axios.put(
+            `http://localhost:8000/api/users/${selectedUser.value._id}`,
+            selectedUser.value,
+          )
+          const index = users.value.findIndex((u) => u._id === selectedUser.value._id)
+          if (index !== -1) {
+            users.value[index] = selectedUser.value
+          }
         } else {
-          await axios.post('http://localhost:5000/api/users', userData)
+          const response = await axios.post('http://localhost:8000/api/users', selectedUser.value)
+          users.value.push({ ...selectedUser.value, _id: response.data._id })
         }
-        this.fetchUsers()
-        this.dialog = false
-      } catch (error) {
-        console.error('Error saving user:', error)
+        showModal.value = false
+      } catch (err) {
+        console.error('Error saving user:', err)
       }
-    },
+    }
 
-    confirmDelete(user) {
-      this.selectedUser = user
-      this.deleteDialog = true
-    },
+    const confirmDelete = (id) => {
+      userIdToDelete.value = id
+      showDeleteConfirm.value = true
+    }
 
-    async deleteUser() {
+    const deleteUser = async () => {
       try {
-        await axios.delete(`http://localhost:5000/api/users/${this.selectedUser._id}`)
-        this.fetchUsers()
-        this.deleteDialog = false
-      } catch (error) {
-        console.error('Error deleting user:', error)
+        await axios.delete(`http://localhost:8000/api/users/${userIdToDelete.value}`)
+        users.value = users.value.filter((user) => user._id !== userIdToDelete.value)
+      } catch (err) {
+        console.error('Error deleting user:', err)
+      } finally {
+        showDeleteConfirm.value = false
       }
-    },
-  },
+    }
 
-  mounted() {
-    this.fetchUsers()
+    const formatDate = (timestamp) => {
+      return timestamp ? new Date(timestamp * 1000).toLocaleString() : 'N/A'
+    }
+
+    onMounted(fetchUsers)
+
+    return {
+      users,
+      headers,
+      loading,
+      error,
+      showModal,
+      showDeleteConfirm,
+      selectedUser,
+      isEditing,
+      openCreateModal,
+      openEditModal,
+      confirmDelete,
+      deleteUser,
+      handleSave,
+      formatDate,
+    }
   },
 }
 </script>

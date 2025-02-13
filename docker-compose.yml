@@ -13,7 +13,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8080:5000"
+      - "8000:8000"
     environment:
       - MONGO_URI=mongodb://mongodb:27017/
       - FLASK_ENV=development
@@ -30,14 +30,22 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:5173"
+      - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:8080
+      - VITE_API_URL=http://localhost:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
+    networks:
+      - app-network
+
+  parser:
+    build: ./backend
+    command: python parser.py
+    depends_on:
+      - mongodb
     networks:
       - app-network
 

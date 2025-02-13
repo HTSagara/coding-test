@@ -1,3 +1,4 @@
+# backend/parser.py
 from dataclasses import dataclass
 import json
 from datetime import datetime
@@ -61,6 +62,8 @@ def main():
     db = client['user_db']
     collection = db['users']
 
+    collection.create_index("username", unique=True, background=True)
+
     # Read JSON file
     with open('users.json', 'r') as file:
         data = json.load(file)
@@ -81,9 +84,11 @@ def main():
             'created_ts': user.created_ts
         }
 
-        # Insert into MongoDB
-        collection.insert_one(user_dict)
-        print(f"Inserted user: {user.username}")
+        try:
+            collection.insert_one(user_dict)
+            print(f"Inserted user: {user.username}")
+        except pymongo.errors.DuplicateKeyError:
+            print(f"Skipped duplicate: {user.username}")
 
 
 if __name__ == '__main__':
