@@ -1,5 +1,6 @@
+// frontend/src/components/UserTable.vue
 <template>
-  <v-container fluid>
+  <v-container>
     <v-row>
       <v-col cols="12">
         <h1 class="text-2xl font-bold mb-4">User List</h1>
@@ -18,9 +19,9 @@
           v-if="!loading && !error"
         >
           <template v-slot:item.username="{ item }">
-            <a :href="'/users/' + item._id" class="text-blue-600 underline">
+            <router-link :to="`/users/${item._id}`" class="text-blue-600 underline">
               {{ item.username }}
-            </a>
+            </router-link>
           </template>
 
           <template v-slot:item.roles="{ item }">
@@ -103,21 +104,28 @@ export default {
     const userIdToDelete = ref(null)
 
     const headers = [
-      { text: 'Username', value: 'username' },
-      { text: 'Roles', value: 'roles' },
-      { text: 'Timezone', value: 'preferences.timezone' },
-      { text: 'Active', value: 'active' },
-      { text: 'Last Updated At', value: 'updated_ts' },
-      { text: 'Created At', value: 'created_ts' },
-      { text: 'Actions', value: 'actions', sortable: false },
+      { title: 'Username', key: 'username' },
+      { title: 'Roles', key: 'roles' },
+      { title: 'Timezone', key: 'preferences.timezone' },
+      { title: 'Active', key: 'active' },
+      { title: 'Last Updated At', key: 'updated_ts' },
+      { title: 'Created At', key: 'created_ts' },
+      { title: 'Actions', key: 'actions', sortable: false },
     ]
 
     const fetchUsers = async () => {
       try {
         const response = await axios.get('http://localhost:8000/api/users')
-        users.value = response.data
+        console.log('Fetched Users:', response.data) // Debugging output
+
+        users.value = response.data.map((user) => ({
+          ...user,
+          roles: Array.isArray(user.roles) ? user.roles : [user.roles], // Ensure roles is an array
+          preferences: user.preferences || { timezone: 'N/A' }, // Ensure preferences exist
+        }))
       } catch (err) {
         error.value = 'Failed to fetch users'
+        console.error('Error fetching users:', err)
       } finally {
         loading.value = false
       }
@@ -148,9 +156,10 @@ export default {
           }
         } else {
           const response = await axios.post('http://localhost:8000/api/users', selectedUser.value)
-          users.value.push({ ...selectedUser.value, _id: response.data._id })
+          users.value = [...users.value, response.data]
         }
         showModal.value = false
+        await fetchUsers()
       } catch (err) {
         console.error('Error saving user:', err)
       }

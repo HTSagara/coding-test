@@ -114,7 +114,10 @@ def create_user():
 
         data['created_ts'] = datetime.now().timestamp()
         result = users_collection.insert_one(data)
-        return jsonify({'_id': str(result.inserted_id)}), 201
+        # Get the full inserted document
+        new_user = users_collection.find_one({'_id': result.inserted_id})
+        new_user['_id'] = str(new_user['_id'])  # Convert ObjectId
+        return jsonify(new_user), 201  # Return complete user data
 
     except pymongo.errors.DuplicateKeyError as e:
         logger.error(f"Duplicate insert attempt: {str(e)}")
@@ -131,16 +134,27 @@ def update_user(id):
     try:
         users_collection = db['users']
         data = request.json
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
+        data.pop('_id', None)
+
         data['updated_ts'] = datetime.now().timestamp()
+
+        # Check if user exists
+        existing_user = users_collection.find_one({'_id': ObjectId(id)})
+        if not existing_user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Proceed with update
         result = users_collection.update_one(
-            {'_id': ObjectId(id)},
-            {'$set': data}
-        )
+            {
+                '_id': ObjectId(id)
+            },
+            {
+                '$set': data
+            }
+            )
         if result.modified_count:
             return jsonify({'message': 'User updated'})
-        return jsonify({'error': 'User not found'}), 404
+        return jsonify({'message': 'No changes made'}), 200
     except Exception as e:
         logger.error(f"Error updating user {id}: {e}")
         return jsonify({"error": str(e)}), 500
@@ -172,7 +186,6 @@ def health_check():
     except errors.ServerSelectionTimeoutError:
         logger.error("MongoDB connection failed")
         return jsonify({"status": "unhealthy"}), 500
-
 
 
 if __name__ == '__main__':

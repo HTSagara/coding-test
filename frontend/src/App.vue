@@ -6,18 +6,13 @@
     </v-app-bar>
 
     <v-main>
-      <UserTable />
+      <router-view />
     </v-main>
   </v-app>
 </template>
 
 <script>
-import UserTable from './components/UserTable.vue'
-
 export default {
   name: 'App',
-  components: {
-    UserTable,
-  },
 }
 </script>

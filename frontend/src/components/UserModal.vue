@@ -49,13 +49,17 @@ export default {
     )
 
     const save = async () => {
-      const url = props.isEditing
-        ? `http://localhost:8000/api/users/${user.value._id}`
-        : 'http://localhost:8000/api/users'
-      const method = props.isEditing ? 'put' : 'post'
+      const userData = { ...user.value }
+      delete userData._id
 
-      const response = await axios[method](url, user.value)
-      emit('save', response.data)
+      if (props.isEditing) {
+        await axios.put(`http://localhost:8000/api/users/${user.value._id}`, userData)
+      } else {
+        const response = await axios.post('http://localhost:8000/api/users', userData)
+        emit('save', { ...userData, _id: response.data._id }) // Update frontend list
+      }
+
+      emit('close') // Close modal after save
     }
 
     return { user, save }
