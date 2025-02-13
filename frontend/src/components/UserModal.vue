@@ -32,37 +32,13 @@
 </template>
 
 <script>
-import { ref, watch } from 'vue'
-import axios from 'axios'
+import useUserForm from '@/composables/useUserForm'
 
 export default {
-  props: ['user', 'isEditing'],
+  props: ['isOpen', 'user', 'isEditing'],
   emits: ['close', 'save'],
   setup(props, { emit }) {
-    const user = ref({ ...props.user })
-
-    watch(
-      () => props.user,
-      (newUser) => {
-        user.value = { ...newUser }
-      },
-    )
-
-    const save = async () => {
-      const userData = { ...user.value }
-      delete userData._id
-
-      if (props.isEditing) {
-        await axios.put(`http://localhost:8000/api/users/${user.value._id}`, userData)
-      } else {
-        const response = await axios.post('http://localhost:8000/api/users', userData)
-        emit('save', { ...userData, _id: response.data._id }) // Update frontend list
-      }
-
-      emit('close') // Close modal after save
-    }
-
-    return { user, save }
+    return useUserForm(props, emit)
   },
 }
 </script>

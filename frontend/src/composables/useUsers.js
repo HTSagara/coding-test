@@ -1,8 +1,8 @@
-// src/composables/useUsers.js
+//frontend/src/composables/useUsers.js
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
-export function useUsers() {
+export default function useUsers() {
   const users = ref([])
   const loading = ref(true)
   const error = ref(null)
@@ -13,13 +13,13 @@ export function useUsers() {
   const userIdToDelete = ref(null)
 
   const headers = [
-    { text: 'Username', value: 'username' },
-    { text: 'Roles', value: 'roles' },
-    { text: 'Timezone', value: 'preferences.timezone' },
-    { text: 'Active', value: 'active' },
-    { text: 'Last Updated At', value: 'updated_ts' },
-    { text: 'Created At', value: 'created_ts' },
-    { text: 'Actions', value: 'actions', sortable: false },
+    { title: 'Username', key: 'username' },
+    { title: 'Roles', key: 'roles' },
+    { title: 'Timezone', key: 'preferences.timezone' },
+    { title: 'Active', key: 'active' },
+    { title: 'Last Updated At', key: 'updated_ts' },
+    { title: 'Created At', key: 'created_ts' },
+    { title: 'Actions', key: 'actions', sortable: false },
   ]
 
   const fetchUsers = async () => {
