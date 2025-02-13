@@ -24,7 +24,7 @@
           </template>
 
           <template v-slot:item.roles="{ item }">
-            {{ item.roles.join(', ') }}
+            {{ Array.isArray(item.roles) ? item.roles.join(', ') : item.roles }}
           </template>
 
           <template v-slot:item.active="{ item }">
